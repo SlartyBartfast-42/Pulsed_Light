@@ -7,11 +7,6 @@ import pandas as pd
 data = pd.read_csv('analog-data.csv')
 data['Time'] = pd.to_datetime((data['Time']))
 
-# data = pd.read_csv("avocado.csv")
-# data = data.query("type == 'conventional' and region == 'Albany'")
-# data["Date"] = pd.to_datetime(data["Date"], format="%Y-%m-%d")
-# data.sort_values("Date", inplace=True)
-
 app = dash.Dash(__name__)
 
 app.layout = html.Div(
@@ -32,18 +27,6 @@ app.layout = html.Div(
                 "layout": {"title": "Pulsed Light Signal"},
             },
         ),
-        # dcc.Graph(
-        #     figure={
-        #         "data": [
-        #             {
-        #                 "x": data["Date"],
-        #                 "y": data["Total Volume"],
-        #                 "type": "lines",
-        #             },
-        #         ],
-        #         "layout": {"title": "Avocados Sold"},
-        #     },
-        # ),
     ]
 )
 

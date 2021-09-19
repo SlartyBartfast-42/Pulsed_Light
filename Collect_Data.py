@@ -1,72 +1,86 @@
 import pandas as pd
 import serial
+import time
 import threading
-import datetime
 from matplotlib import pyplot as plt
 
+file_name = "Photodiode_20Hz.csv"
+
+# This code is for listing available serial/COM ports
 # from serial.tools import list_ports
 # ports = list(list_ports.comports(include_links=False))
 # for port in ports:
 #     print(port.name)
 
+# Create instance of the Serial class
 baud = 115200
-run = 1
-fileName = "analog_data_2.csv"
 arduino = serial.Serial('COM3', baudrate=baud)
+
+# Initialize global variables
+run = True
 raw_data = []
 time_list = []
-start = datetime.datetime.now()
-stop = datetime.datetime.now()
 
 
-def normal():
+def collect_data():
+    """
+    The collect_data function reads serial data and writes to the global raw_data list.  It also
+    uses the time.perf_counter to update the time_list allowing for the evaluation of time between samples
+    and overall duration.
+    """
     global run
     global raw_data
     global time_list
-    global start
-    global stop
-    # Write column headers
-    # with open(fileName, "a") as file:
-    #     c1 = 'Amplitude'
-    #     c2 = 'Time'
-    #     file.write(f'{c1},{c2}\n')  # write data with a newline
 
-    start = datetime.datetime.now()
     while run == 1:
         raw_data.append(arduino.readline())
-        time_list.append(datetime.datetime.now())
-        # get_data = arduino.readline()
-        # data = int(get_data.strip())
-        # print(int(get_data.strip()))
+        time_list.append(time.perf_counter())
 
-        # append the data to the file
-        # with open(fileName, "a") as d_file:
-        #     # write data with a newline
-        #     d_file.write(f'{data},{datetime.datetime.now()}\n')
-
+        # Evaluates global run variable
         if not run:
-            stop = datetime.datetime.now()
-            print('The while loop is now closing')
+            arduino.close()
+            print('The data collection loop has exited')
 
 
 def get_input():
+    """
+    the get_input function is used to signal the collect data thread stop collecting data.
+    """
     global run
-    keystrk = input()
-    # thread doesn't continue until key is pressed
-    print('You pressed: ', keystrk)
+    print('Press Enter to end data collection')
+    input()
+    # thread doesn't continue until Enter is pressed
     run = False
     print('run is now:', run)
 
 
-n = threading.Thread(target=normal)
-i = threading.Thread(target=get_input)
-n.start()
-i.start()
-n.join()
-i.join()
+def convert_to_int(string_data):
+    try:
+        # Data sent from Arduino is 8-bit Hex
+        integer = int(string_data.strip(), 16)
+    except ValueError:
+        # If unable to convert string of hex bytes to 8-bit integer, write None
+        print(string_data)
+        integer = None
+    return integer
 
+
+collect = threading.Thread(target=collect_data)
+input = threading.Thread(target=get_input)
+collect.start()
+input.start()
+collect.join()
+
+# Convert list to dataframe
 df = pd.DataFrame(raw_data, columns=['Raw'])
 df['Time'] = time_list
-df = df[10:-10]
-df['Amplitude'] = df['Raw'].apply(lambda x: int(x.strip()))
-df.to_csv(fileName, columns=['Amplitude', 'Time'])
+
+# Filter out first 100 data points, typically odd data and time gaps are within the first 100 readings
+df = df[100:]
+
+# Convert raw data from string of hex bytes to 8-bit integer
+df['Amplitude'] = df['Raw'].apply(lambda x: convert_to_int(x))
+
+# Write data to CSV file
+df.to_csv(file_name, columns=['Raw', 'Time', 'Amplitude'], index=False)
+print(f'Data written to {file_name}')
